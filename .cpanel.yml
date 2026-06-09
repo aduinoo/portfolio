@@ -1,0 +1,8 @@
+---
+deployment:
+  tasks:
+    - export APPPATH=/home2/adlinafi/repositories/portfolio
+    - export PUBLICPATH=/home2/adlinafi/public_html/adlinafiqh.com
+    - /bin/mkdir -p "$PUBLICPATH"
+    - composer install --working-dir="$APPPATH" --no-dev --prefer-dist --no-interaction --optimize-autoloader
+    - /bin/cp -R "$APPPATH/public/." "$PUBLICPATH"
