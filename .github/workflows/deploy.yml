@@ -1,4 +1,4 @@
-name: Validate Deployment Setup
+name: Deploy Laravel to cPanel via FTP
 
 on:
   push:
@@ -6,12 +6,77 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: cpanel-ftp-deploy
+  cancel-in-progress: true
+
 jobs:
-  deployment-note:
+  ftp-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Explain deployment flow
-        run: |
-          echo "Production deployment is handled by the cPanel cron job."
-          echo "This workflow exists as a reminder that pushes to main are picked up from GitHub by cPanel."
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+
+      - name: Install PHP dependencies
+        run: composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Deploy Laravel application files
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ secrets.FTP_PORT || 21 }}
+          protocol: ftps
+          security: loose
+          local-dir: ./
+          server-dir: ${{ secrets.FTP_APP_DIR }}
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/.codex/**
+            **/tests/**
+            **/node_modules/**
+            **/.env*
+            **/storage/logs/**
+            **/storage/framework/cache/**
+            **/storage/framework/sessions/**
+            **/storage/framework/testing/**
+            **/storage/framework/views/**
+            **/database/*.sqlite
+            **/phpunit.xml
+            **/README.md
+            public/**
+
+      - name: Deploy public web files
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ secrets.FTP_PORT || 21 }}
+          protocol: ftps
+          security: loose
+          local-dir: ./public/
+          server-dir: ${{ secrets.FTP_PUBLIC_DIR }}
+          exclude: |
+            **/.git*
