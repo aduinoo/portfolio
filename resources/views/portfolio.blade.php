@@ -17,7 +17,7 @@
                                 Adlina Fiqh
                             </h1>
                             <p class="mt-6 max-w-2xl text-lg leading-8 text-[#5a5146]">
-                                Building clean, fast, and thoughtful web experiences.test
+                                Building clean, fast, and thoughtful web experiensces.test
                             </p>
                         </div>
                         <div class="grid gap-4 rounded-3xl bg-[#1d1a16] p-6 text-[#fffaf3]">
