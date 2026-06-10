@@ -30,7 +30,6 @@ jobs:
           username: ${{ secrets.CPANEL_USERNAME }}
           key: ${{ secrets.CPANEL_SSH_PRIVATE_KEY }}
           port: ${{ secrets.CPANEL_PORT || 22 }}
-          script_stop: true
           envs: GITHUB_REF_NAME,CPANEL_REPOSITORY_PATH,CPANEL_PUBLIC_PATH
           script: |
             set -e
