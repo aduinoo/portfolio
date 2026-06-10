@@ -38,10 +38,7 @@ jobs:
           eval "$(ssh-agent -s)"
 
           if [ -n "${CPANEL_SSH_PASSPHRASE:-}" ]; then
-            cat > "$RUNNER_TEMP/ssh-askpass.sh" <<'EOF'
-#!/usr/bin/env bash
-printf '%s\n' "$CPANEL_SSH_PASSPHRASE"
-EOF
+            printf '%s\n%s\n' '#!/usr/bin/env bash' 'printf "%s\n" "$CPANEL_SSH_PASSPHRASE"' > "$RUNNER_TEMP/ssh-askpass.sh"
             chmod 700 "$RUNNER_TEMP/ssh-askpass.sh"
             DISPLAY=:0 SSH_ASKPASS="$RUNNER_TEMP/ssh-askpass.sh" SSH_ASKPASS_REQUIRE=force setsid ssh-add "$HOME/.ssh/cpanel_deploy_key" < /dev/null
           else
