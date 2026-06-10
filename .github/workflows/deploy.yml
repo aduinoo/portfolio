@@ -1,4 +1,4 @@
-name: Deploy Laravel to cPanel
+name: Validate Deployment Setup
 
 on:
   push:
@@ -6,65 +6,12 @@ on:
       - main
   workflow_dispatch:
 
-concurrency:
-  group: cpanel-production-deploy
-  cancel-in-progress: true
-
-env:
-  CPANEL_REPOSITORY_PATH: /home2/adlinafi/repositories/portfolio
-
 jobs:
-  git-push-deploy:
+  deployment-note:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Start SSH agent
-        shell: bash
-        env:
-          CPANEL_SSH_PRIVATE_KEY: ${{ secrets.CPANEL_SSH_PRIVATE_KEY }}
-          CPANEL_SSH_PASSPHRASE: ${{ secrets.CPANEL_SSH_PASSPHRASE }}
+      - name: Explain deployment flow
         run: |
-          set -euo pipefail
-          mkdir -p "$HOME/.ssh"
-          chmod 700 "$HOME/.ssh"
-          printf '%s\n' "$CPANEL_SSH_PRIVATE_KEY" > "$HOME/.ssh/cpanel_deploy_key"
-          chmod 600 "$HOME/.ssh/cpanel_deploy_key"
-
-          eval "$(ssh-agent -s)"
-
-          if [ -n "${CPANEL_SSH_PASSPHRASE:-}" ]; then
-            printf '%s\n%s\n' '#!/usr/bin/env bash' 'printf "%s\n" "$CPANEL_SSH_PASSPHRASE"' > "$RUNNER_TEMP/ssh-askpass.sh"
-            chmod 700 "$RUNNER_TEMP/ssh-askpass.sh"
-            DISPLAY=:0 SSH_ASKPASS="$RUNNER_TEMP/ssh-askpass.sh" SSH_ASKPASS_REQUIRE=force setsid ssh-add "$HOME/.ssh/cpanel_deploy_key" < /dev/null
-          else
-            ssh-add "$HOME/.ssh/cpanel_deploy_key"
-          fi
-
-      - name: Trust cPanel SSH host
-        shell: bash
-        env:
-          CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
-          CPANEL_PORT: ${{ secrets.CPANEL_PORT || 22 }}
-        run: |
-          set -euo pipefail
-          ssh-keyscan -p "$CPANEL_PORT" "$CPANEL_HOST" >> "$HOME/.ssh/known_hosts"
-          chmod 600 "$HOME/.ssh/known_hosts"
-
-      - name: Push main to cPanel managed repository
-        shell: bash
-        env:
-          CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
-          CPANEL_PORT: ${{ secrets.CPANEL_PORT || 22 }}
-          CPANEL_USERNAME: ${{ secrets.CPANEL_USERNAME }}
-          GITHUB_REF_NAME: ${{ github.ref_name }}
-          CPANEL_REPOSITORY_PATH: ${{ env.CPANEL_REPOSITORY_PATH }}
-        run: |
-          set -euo pipefail
-          git remote remove cpanel 2>/dev/null || true
-          git remote add cpanel "ssh://$CPANEL_USERNAME@$CPANEL_HOST:$CPANEL_PORT$CPANEL_REPOSITORY_PATH"
-          git push cpanel "HEAD:$GITHUB_REF_NAME"
+          echo "Production deployment is handled by the cPanel cron job."
+          echo "This workflow exists as a reminder that pushes to main are picked up from GitHub by cPanel."
