@@ -12,32 +12,62 @@ concurrency:
 
 env:
   CPANEL_REPOSITORY_PATH: /home2/adlinafi/repositories/portfolio
-  CPANEL_PUBLIC_PATH: /home2/adlinafi/public_html/adlinafiqh.com
 
 jobs:
-  git-deploy:
+  git-push-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Pull latest code on cPanel and deploy
-        uses: appleboy/ssh-action@v1.2.2
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Start SSH agent
+        shell: bash
         env:
+          CPANEL_SSH_PRIVATE_KEY: ${{ secrets.CPANEL_SSH_PRIVATE_KEY }}
+          CPANEL_SSH_PASSPHRASE: ${{ secrets.CPANEL_SSH_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\n' "$CPANEL_SSH_PRIVATE_KEY" > "$HOME/.ssh/cpanel_deploy_key"
+          chmod 600 "$HOME/.ssh/cpanel_deploy_key"
+
+          eval "$(ssh-agent -s)"
+
+          if [ -n "${CPANEL_SSH_PASSPHRASE:-}" ]; then
+            cat > "$RUNNER_TEMP/ssh-askpass.sh" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$CPANEL_SSH_PASSPHRASE"
+EOF
+            chmod 700 "$RUNNER_TEMP/ssh-askpass.sh"
+            DISPLAY=:0 SSH_ASKPASS="$RUNNER_TEMP/ssh-askpass.sh" SSH_ASKPASS_REQUIRE=force setsid ssh-add "$HOME/.ssh/cpanel_deploy_key" < /dev/null
+          else
+            ssh-add "$HOME/.ssh/cpanel_deploy_key"
+          fi
+
+      - name: Trust cPanel SSH host
+        shell: bash
+        env:
+          CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
+          CPANEL_PORT: ${{ secrets.CPANEL_PORT || 22 }}
+        run: |
+          set -euo pipefail
+          ssh-keyscan -p "$CPANEL_PORT" "$CPANEL_HOST" >> "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Push main to cPanel managed repository
+        shell: bash
+        env:
+          CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
+          CPANEL_PORT: ${{ secrets.CPANEL_PORT || 22 }}
+          CPANEL_USERNAME: ${{ secrets.CPANEL_USERNAME }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
           CPANEL_REPOSITORY_PATH: ${{ env.CPANEL_REPOSITORY_PATH }}
-          CPANEL_PUBLIC_PATH: ${{ env.CPANEL_PUBLIC_PATH }}
-        with:
-          host: ${{ secrets.CPANEL_HOST }}
-          username: ${{ secrets.CPANEL_USERNAME }}
-          key: ${{ secrets.CPANEL_SSH_PRIVATE_KEY }}
-          passphrase: ${{ secrets.CPANEL_SSH_PASSPHRASE }}
-          port: ${{ secrets.CPANEL_PORT || 22 }}
-          envs: GITHUB_REF_NAME,CPANEL_REPOSITORY_PATH,CPANEL_PUBLIC_PATH
-          script: |
-            set -e
-            cd "$CPANEL_REPOSITORY_PATH"
-            git checkout "$GITHUB_REF_NAME"
-            git pull --ff-only origin "$GITHUB_REF_NAME"
-            composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
-            php artisan optimize:clear
-            mkdir -p "$CPANEL_PUBLIC_PATH"
-            cp -R public/. "$CPANEL_PUBLIC_PATH"
+        run: |
+          set -euo pipefail
+          git remote remove cpanel 2>/dev/null || true
+          git remote add cpanel "ssh://$CPANEL_USERNAME@$CPANEL_HOST:$CPANEL_PORT$CPANEL_REPOSITORY_PATH"
+          git push cpanel "HEAD:$GITHUB_REF_NAME"
